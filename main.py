@@ -1,13 +1,13 @@
 from products import Product
 from store import Store
-# setup initial stock of inventory
+# setup initial stock of inventory0704
 product_list = [ Product("MacBook Air M2", price=1450, quantity=100),
                  Product("Bose QuietComfort Earbuds", price=250, quantity=500),
                  Product("Google Pixel 7", price=500, quantity=500)
                ]
 best_buy = Store(product_list)
 
-def start(store):
+def start(store: Store) -> None:
     """
     Start the store program.
     Shows a menu with options to view products, total quantity,
@@ -44,15 +44,34 @@ def start(store):
                 for prod, qty in order_list:
                     planned_quantities[prod] = planned_quantities.get(prod, 0) + qty
 
-                # Show all active products with index
-                active_products = [p for p in store.get_all_products()
-                                   if p.get_quantity() > 0]
+                # Show all products including inactive ones
                 print("\nAvailable products:")
-                for index, product in enumerate(active_products):
+                products_for_order = store.products  # include all products
+                for index, product in enumerate(products_for_order, start=1):
                     planned = planned_quantities.get(product, 0)
                     available = product.get_quantity() - planned
-                    print(f"{index}. {product.name} (Quantity available: {available}, "
-                          f"Active: {product.is_active()})")
+                    if available <= 0:
+                        product.deactivate()
+                    print(f"{index}. {product.name} (Quantity available: {available}, Active: {product.is_active()})")
+
+                # Check if all products are unavailable
+                if all(product.get_quantity() - planned_quantities.get(product, 0) <= 0 for product in products_for_order):
+                    if order_list:
+                        # process the order immediately
+                        try:
+                            total = store.order(order_list)
+                            print("\nOrder successful! Summary:")
+                            print(f"{'Product':30} {'Unit Price':>12} {'Quantity':>10} {'Subtotal':>12}")
+                            for product, quantity in order_list:
+                                subtotal = product.price * quantity
+                                print(f"{product.name:30} {product.price:12} €{quantity:10} {subtotal:12} €")
+                            print("-" * 70)
+                            print(f"{'Total':>54} {total:12} €")
+                        except Exception as e:
+                            raise RuntimeError("Order failed") from e
+                    else:
+                        print("No products are available for ordering at this time.")
+                    break
 
                 # choose product index
                 index_input = input("Enter the product number you want to order (or 'q' to cancel): ").strip()
@@ -64,18 +83,14 @@ def start(store):
                     continue
 
                 index = int(index_input)
-                if index < 0 or index >= len(active_products) or not active_products[index].is_active() and \
-                   active_products[index].get_quantity() > 0:
-                    print("Product index out of range or inactive.")
+                if index < 1 or index > len(products_for_order):
+                    print("Product index out of range.")
                     continue
 
-                selected_product = active_products[index]
+                selected_product = products_for_order[index - 1]
 
-                planned = planned_quantities.get(selected_product, 0)
-                available = selected_product.get_quantity() - planned
-
-                if available <= 0:
-                    print(f"Sorry, {selected_product.name} is out of stock.")
+                if selected_product.get_quantity() <= 0 or not selected_product.is_active():
+                    print(f"Sorry, {selected_product.name} is not available.")
                     continue
 
                 # choose quantity
@@ -121,7 +136,7 @@ def start(store):
                         print("-" * 70)
                         print(f"{'Total':>54} {total:12} €")
                     except Exception as e:
-                        raise Exception("Order failed") from e
+                        raise RuntimeError("Order failed") from e
                     break
 
         elif choice == "4":
